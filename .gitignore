@@ -1,0 +1,30 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+*.db
+*.cache
+*.vsidx
+*.nupkg
+*.log
+
+# SQLite
+*.db
+
+# VS
+.vs/
+.vscode/
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db

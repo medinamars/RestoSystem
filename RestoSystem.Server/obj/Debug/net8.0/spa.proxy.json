@@ -3,7 +3,7 @@
 "ServerUrl": "https://localhost:49358",
 "RedirectUrl": "",
 "LaunchCommand": "npm run dev",
-"WorkingDirectory": "D:\\GitHub\\medinamars\\RestoSystem\\RestoSystem.Server\\..\\restosystem.client",
+"WorkingDirectory": "/home/sylphy/.hermes/profiles/saracodehermes/home/RestoSystem/RestoSystem.Server/../restosystem.client",
 "MaxTimeoutInSeconds": "120",
 "KeepRunning": "false"
 }
