@@ -20,24 +20,33 @@ public class HRController : BaseApiController
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<EmploymentStatus>(status, out var empStatus))
             query = query.Where(e => e.Status == empStatus);
 
-        var result = await query.OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
-            .Select(e => new
-            {
-                e.Id,
-                e.EmployeeCode,
-                e.FirstName,
-                e.LastName,
-                e.MiddleName,
-                e.ContactNumber,
-                e.Email,
-                e.Position,
-                e.Role,
-                e.Status,
-                e.HireDate,
-                e.BaseSalary,
-                BranchId = e.BranchId
-            })
+        var employees = await query.OrderBy(e => e.LastName).ThenBy(e => e.FirstName).ToListAsync();
+
+        // Load branch names separately to avoid query filter + navigation issues
+        var branchIds = employees.Select(e => e.BranchId).Distinct().ToList();
+        var branches = await _db.Branches
+            .Where(b => branchIds.Contains(b.Id))
+            .Select(b => new { b.Id, b.Name })
             .ToListAsync();
+        var branchMap = branches.ToDictionary(b => b.Id, b => b.Name);
+
+        var result = employees.Select(e => new
+        {
+            e.Id,
+            e.EmployeeCode,
+            e.FirstName,
+            e.LastName,
+            e.MiddleName,
+            e.ContactNumber,
+            e.Email,
+            e.Position,
+            e.Role,
+            e.Status,
+            e.HireDate,
+            e.BaseSalary,
+            BranchId = e.BranchId,
+            BranchName = branchMap.GetValueOrDefault(e.BranchId)
+        }).ToList();
 
         return Ok(result);
     }

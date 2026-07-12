@@ -390,6 +390,17 @@ select.form-control {
   flex: 1;
 }
 
+/* Error banner */
+.error-banner {
+  background: rgba(230,57,70,0.12);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.85rem;
+}
+
 /* Status indicator */
 .status-dot {
   display: inline-block;
