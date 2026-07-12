@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RestoSystem.Server.Data;
+using RestoSystem.Server.Models.Common;
 using RestoSystem.Server.Models.HR;
 
 namespace RestoSystem.Server.Controllers;
@@ -74,10 +75,27 @@ public class HRController : BaseApiController
     }
 
     [HttpPost("employees")]
-    public async Task<IActionResult> CreateEmployee([FromBody] Employee employee)
+    public async Task<IActionResult> CreateEmployee([FromBody] CreateEmployeeRequest req)
     {
-        employee.Status = EmploymentStatus.Probationary;
-        employee.EmployeeCode = $"EMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}";
+        var employee = new Employee
+        {
+            BranchId = req.BranchId,
+            FirstName = req.FirstName,
+            LastName = req.LastName,
+            MiddleName = req.MiddleName,
+            Position = req.Position,
+            Role = Enum.Parse<UserRole>(req.Role),
+            BaseSalary = req.BaseSalary,
+            CommissionRate = req.CommissionRate,
+            ReceivesMealAllowance = req.ReceivesMealAllowance,
+            MealAllowanceAmount = req.MealAllowanceAmount,
+            ContactNumber = req.ContactNumber,
+            Email = req.Email,
+            Address = req.Address,
+            HireDate = req.HireDate,
+            Status = EmploymentStatus.Probationary,
+            EmployeeCode = $"EMP-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..4].ToUpper()}"
+        };
         _db.Employees.Add(employee);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetEmployee), new { id = employee.Id }, employee);
@@ -360,3 +378,20 @@ public class HRController : BaseApiController
 // Request DTOs
 public record ClockInRequest(int EmployeeId, bool IsFaceVerified, string? FaceImagePath);
 public record GeneratePayrollRequest(DateTime WeekStart, DateTime WeekEnd, DateTime PayDate);
+
+public record CreateEmployeeRequest(
+    int BranchId,
+    string FirstName,
+    string LastName,
+    string? MiddleName,
+    string Position,
+    string Role,
+    decimal BaseSalary,
+    decimal CommissionRate,
+    bool ReceivesMealAllowance,
+    decimal MealAllowanceAmount,
+    string ContactNumber,
+    string Email,
+    string Address,
+    DateTime HireDate
+);

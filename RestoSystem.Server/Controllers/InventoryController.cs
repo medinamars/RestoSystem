@@ -36,9 +36,22 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("items")]
-    public async Task<IActionResult> CreateItem([FromBody] InventoryItem item)
+    public async Task<IActionResult> CreateItem([FromBody] CreateItemRequest req)
     {
-        item.CurrentStock = 0;
+        var item = new InventoryItem
+        {
+            BranchId = req.BranchId,
+            Name = req.Name,
+            Category = req.Category,
+            UnitOfMeasure = req.UnitOfMeasure,
+            MinStockLevel = req.MinStockLevel,
+            ReorderPoint = req.ReorderPoint,
+            CurrentStock = 0,
+            IsPerishable = req.IsPerishable,
+            IsActive = true,
+            Description = req.Description,
+            Barcode = req.Barcode
+        };
         _db.InventoryItems.Add(item);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetItem), new { id = item.Id }, item);
@@ -85,25 +98,24 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("batches")]
-    public async Task<IActionResult> CreateBatch([FromBody] InventoryBatch batch)
+    public async Task<IActionResult> CreateBatch([FromBody] CreateBatchRequest req)
     {
-        batch.ReceivedDate = DateTime.UtcNow;
+        var batch = new InventoryBatch
+        {
+            InventoryItemId = req.InventoryItemId,
+            StorageLocationId = req.StorageLocationId,
+            BatchNumber = req.BatchNumber,
+            Quantity = req.Quantity,
+            UnitCost = req.UnitCost,
+            ExpiryDate = req.ExpiryDate,
+            SupplierId = req.SupplierId,
+            ReceivedDate = DateTime.UtcNow
+        };
         _db.InventoryBatches.Add(batch);
 
         // Update item stock
         var item = await _db.InventoryItems.FindAsync(batch.InventoryItemId);
         if (item != null) item.CurrentStock += batch.Quantity;
-
-        // Record movement
-        _db.StockMovements.Add(new StockMovement
-        {
-            InventoryBatchId = batch.Id,
-            MovementType = MovementType.Inbound,
-            Quantity = batch.Quantity,
-            UnitCostAtMovement = batch.UnitCost,
-            MovementDate = DateTime.UtcNow,
-            Notes = $"Initial batch receipt"
-        });
 
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetBatches), new { id = batch.Id }, batch);
@@ -166,8 +178,18 @@ public class InventoryController : BaseApiController
         Ok(await _db.Suppliers.Where(s => s.IsActive).OrderBy(s => s.Name).ToListAsync());
 
     [HttpPost("suppliers")]
-    public async Task<IActionResult> CreateSupplier([FromBody] Supplier supplier)
+    public async Task<IActionResult> CreateSupplier([FromBody] CreateSupplierRequest req)
     {
+        var supplier = new Supplier
+        {
+            Name = req.Name,
+            ContactPerson = req.ContactPerson,
+            ContactNumber = req.ContactNumber,
+            Email = req.Email,
+            Address = req.Address,
+            TinNumber = req.TinNumber,
+            IsActive = true
+        };
         _db.Suppliers.Add(supplier);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetSuppliers), new { id = supplier.Id }, supplier);
@@ -320,9 +342,10 @@ public class InventoryController : BaseApiController
         var nearExpiry = await batchesQuery
             .Where(b => b.ExpiryDate != null && b.ExpiryDate <= DateTime.UtcNow.AddDays(7) && b.Quantity > 0)
             .CountAsync();
-        var totalWaste = await wasteQuery
+        var wasteRecords = await wasteQuery
             .Where(w => w.WasteDate >= DateTime.UtcNow.AddDays(-30))
-            .SumAsync(w => w.EstimatedCost);
+            .ToListAsync();
+        var totalWaste = wasteRecords.Sum(w => (double)w.EstimatedCost);
 
         return Ok(new
         {
@@ -333,3 +356,35 @@ public class InventoryController : BaseApiController
         });
     }
 }
+
+// Request DTOs
+public record CreateItemRequest(
+    int BranchId,
+    string Name,
+    string Category,
+    string UnitOfMeasure,
+    decimal MinStockLevel,
+    decimal ReorderPoint,
+    bool IsPerishable,
+    string? Description = null,
+    string? Barcode = null
+);
+
+public record CreateBatchRequest(
+    int InventoryItemId,
+    int StorageLocationId,
+    decimal Quantity,
+    decimal UnitCost,
+    DateTime? ExpiryDate = null,
+    string? BatchNumber = null,
+    int? SupplierId = null
+);
+
+public record CreateSupplierRequest(
+    string Name,
+    string ContactPerson,
+    string ContactNumber,
+    string Email,
+    string Address,
+    string TinNumber
+);
