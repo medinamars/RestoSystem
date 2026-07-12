@@ -308,20 +308,20 @@ public class AppDbContext : DbContext
         var now = new DateTime(2026, 7, 12, 0, 0, 0, DateTimeKind.Utc);
 
         modelBuilder.Entity<Branch>().HasData(
-            new Branch { Id = 1, Code = "HQ", Name = "Main Branch", Address = "Manila, Philippines", ContactNumber = "02-1234567", OperatingHours = "24/7", IsActive = true, CreatedAt = now, UpdatedAt = now },
-            new Branch { Id = 2, Code = "QC", Name = "Quezon City Branch", Address = "Quezon City, Philippines", ContactNumber = "02-7654321", OperatingHours = "24/7", IsActive = true, CreatedAt = now, UpdatedAt = now }
+            new Branch { Id = 1, Code = "HQ", Name = "Main Branch", Address = "Manila, Philippines", ContactNumber = "02-1234567", OperatingHours = "24/7", IsActive = true, IsDeleted = false, CreatedAt = now, UpdatedAt = now },
+            new Branch { Id = 2, Code = "QC", Name = "Quezon City Branch", Address = "Quezon City, Philippines", ContactNumber = "02-7654321", OperatingHours = "24/7", IsActive = true, IsDeleted = false, CreatedAt = now, UpdatedAt = now }
         );
 
         modelBuilder.Entity<Supplier>().HasData(
-            new Supplier { Id = 1, Name = "Fresh Produce Supply Co.", ContactPerson = "Juan Dela Cruz", ContactNumber = "09171234567", Email = "juan@freshproduce.com", Address = "Manila", TinNumber = "123-456-789-000", IsActive = true, CreatedAt = now, UpdatedAt = now },
-            new Supplier { Id = 2, Name = "Meat Distributors Inc.", ContactPerson = "Maria Santos", ContactNumber = "09189876543", Email = "maria@meatdist.com", Address = "Quezon City", TinNumber = "987-654-321-000", IsActive = true, CreatedAt = now, UpdatedAt = now }
+            new Supplier { Id = 1, Name = "Fresh Produce Supply Co.", ContactPerson = "Juan Dela Cruz", ContactNumber = "09171234567", Email = "juan@freshproduce.com", Address = "Manila", TinNumber = "123-456-789-000", IsActive = true, IsDeleted = false, CreatedAt = now, UpdatedAt = now },
+            new Supplier { Id = 2, Name = "Meat Distributors Inc.", ContactPerson = "Maria Santos", ContactNumber = "09189876543", Email = "maria@meatdist.com", Address = "Quezon City", TinNumber = "987-654-321-000", IsActive = true, IsDeleted = false, CreatedAt = now, UpdatedAt = now }
         );
 
         modelBuilder.Entity<StorageLocation>().HasData(
-            new StorageLocation { Id = 1, BranchId = 1, Area = "Freezer-A", StorageArea = StorageArea.Freezer, Description = "Main freezer - meats and frozen goods", CreatedAt = now, UpdatedAt = now },
-            new StorageLocation { Id = 2, BranchId = 1, Area = "Chiller-1", StorageArea = StorageArea.Chiller, Description = "Vegetable chiller", CreatedAt = now, UpdatedAt = now },
-            new StorageLocation { Id = 3, BranchId = 1, Area = "Dry-Shelf-1", StorageArea = StorageArea.Dry, Description = "Dry goods - rice, canned goods", CreatedAt = now, UpdatedAt = now },
-            new StorageLocation { Id = 4, BranchId = 2, Area = "Freezer-B", StorageArea = StorageArea.Freezer, Description = "QC freezer", CreatedAt = now, UpdatedAt = now }
+            new StorageLocation { Id = 1, BranchId = 1, Area = "Freezer-A", StorageArea = StorageArea.Freezer, Description = "Main freezer - meats and frozen goods", IsDeleted = false, CreatedAt = now, UpdatedAt = now },
+            new StorageLocation { Id = 2, BranchId = 1, Area = "Chiller-1", StorageArea = StorageArea.Chiller, Description = "Vegetable chiller", IsDeleted = false, CreatedAt = now, UpdatedAt = now },
+            new StorageLocation { Id = 3, BranchId = 1, Area = "Dry-Shelf-1", StorageArea = StorageArea.Dry, Description = "Dry goods - rice, canned goods", IsDeleted = false, CreatedAt = now, UpdatedAt = now },
+            new StorageLocation { Id = 4, BranchId = 2, Area = "Freezer-B", StorageArea = StorageArea.Freezer, Description = "QC freezer", IsDeleted = false, CreatedAt = now, UpdatedAt = now }
         );
     }
 

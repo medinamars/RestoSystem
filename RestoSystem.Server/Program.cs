@@ -36,17 +36,19 @@ var app = builder.Build();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 
-// Auto-migrate in development
+// Swagger in development
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
+}
 
-    using var scope = app.Services.CreateScope();
+// Always seed data (InMemory doesn't persist HasData seeds)
+using (var scope = app.Services.CreateScope())
+{
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     db.Database.EnsureCreated();
 
-    // Seed data if empty
     if (!db.Branches.Any())
     {
         var now = DateTime.UtcNow;
@@ -64,7 +66,7 @@ if (app.Environment.IsDevelopment())
             new StorageLocation { BranchId = 1, Area = "Dry-Shelf-1", StorageArea = StorageArea.Dry, Description = "Dry goods - rice, canned goods", CreatedAt = now, UpdatedAt = now },
             new StorageLocation { BranchId = 2, Area = "Freezer-B", StorageArea = StorageArea.Freezer, Description = "QC freezer", CreatedAt = now, UpdatedAt = now }
         );
-        await db.SaveChangesAsync();
+        db.SaveChanges();
     }
 }
 

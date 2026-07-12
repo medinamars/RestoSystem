@@ -14,22 +14,38 @@ public class HRController : BaseApiController
     [HttpGet("employees")]
     public async Task<IActionResult> GetEmployees([FromQuery] int? branchId, [FromQuery] string? status)
     {
-        var query = _db.Employees
-            .Include(e => e.Branch)
-            .AsQueryable();
+        var query = _db.Employees.AsQueryable();
 
         if (branchId.HasValue) query = query.Where(e => e.BranchId == branchId);
         if (!string.IsNullOrEmpty(status) && Enum.TryParse<EmploymentStatus>(status, out var empStatus))
             query = query.Where(e => e.Status == empStatus);
 
-        return Ok(await query.OrderBy(e => e.LastName).ThenBy(e => e.FirstName).ToListAsync());
+        var result = await query.OrderBy(e => e.LastName).ThenBy(e => e.FirstName)
+            .Select(e => new
+            {
+                e.Id,
+                e.EmployeeCode,
+                e.FirstName,
+                e.LastName,
+                e.MiddleName,
+                e.ContactNumber,
+                e.Email,
+                e.Position,
+                e.Role,
+                e.Status,
+                e.HireDate,
+                e.BaseSalary,
+                BranchId = e.BranchId
+            })
+            .ToListAsync();
+
+        return Ok(result);
     }
 
     [HttpGet("employees/{id}")]
     public async Task<IActionResult> GetEmployee(int id)
     {
         var employee = await _db.Employees
-            .Include(e => e.Branch)
             .Include(e => e.Documents)
             .Include(e => e.Memos)
             .Include(e => e.PerformanceReviews)
@@ -37,10 +53,14 @@ public class HRController : BaseApiController
 
         if (employee == null) return NotFound();
 
-        // Calculate tenure
         var tenure = DateTime.UtcNow - employee.HireDate;
         var regularizationEligible = employee.Status == EmploymentStatus.Probationary
-            && tenure.TotalDays >= 150; // 5 months probation
+            && tenure.TotalDays >= 150;
+
+        // Load branch separately to avoid query filter interaction
+        var branch = await _db.Branches
+            .IgnoreQueryFilters()
+            .FirstOrDefaultAsync(b => b.Id == employee.BranchId);
 
         return Ok(new
         {
@@ -55,7 +75,7 @@ public class HRController : BaseApiController
             employee.Address,
             employee.BirthDate,
             employee.GovernmentIds,
-            employee.Branch,
+            Branch = branch != null ? new { branch.Id, branch.Code, branch.Name } : null,
             employee.Position,
             employee.Role,
             employee.Status,
@@ -102,26 +122,26 @@ public class HRController : BaseApiController
     }
 
     [HttpPut("employees/{id}")]
-    public async Task<IActionResult> UpdateEmployee(int id, [FromBody] Employee update)
+    public async Task<IActionResult> UpdateEmployee(int id, [FromBody] UpdateEmployeeRequest req)
     {
         var emp = await _db.Employees.FindAsync(id);
         if (emp == null) return NotFound();
 
-        emp.FirstName = update.FirstName;
-        emp.LastName = update.LastName;
-        emp.MiddleName = update.MiddleName;
-        emp.ContactNumber = update.ContactNumber;
-        emp.Email = update.Email;
-        emp.Address = update.Address;
-        emp.Position = update.Position;
-        emp.Role = update.Role;
-        emp.BaseSalary = update.BaseSalary;
-        emp.CommissionRate = update.CommissionRate;
-        emp.BranchId = update.BranchId;
-        emp.Status = update.Status;
-        emp.ReceivesMealAllowance = update.ReceivesMealAllowance;
-        emp.MealAllowanceAmount = update.MealAllowanceAmount;
-        emp.Notes = update.Notes;
+        emp.FirstName = req.FirstName;
+        emp.LastName = req.LastName;
+        emp.MiddleName = req.MiddleName;
+        emp.ContactNumber = req.ContactNumber;
+        emp.Email = req.Email;
+        emp.Address = req.Address;
+        emp.Position = req.Position;
+        emp.Role = req.Role;
+        emp.BaseSalary = req.BaseSalary;
+        emp.CommissionRate = req.CommissionRate;
+        emp.BranchId = req.BranchId;
+        emp.Status = req.Status;
+        emp.ReceivesMealAllowance = req.ReceivesMealAllowance;
+        emp.MealAllowanceAmount = req.MealAllowanceAmount;
+        emp.Notes = req.Notes;
 
         await _db.SaveChangesAsync();
         return Ok(emp);
@@ -148,7 +168,6 @@ public class HRController : BaseApiController
         var employee = await _db.Employees.FindAsync(request.EmployeeId);
         if (employee == null) return NotFound("Employee not found");
 
-        // Check if already clocked in without clock-out
         var openLog = await _db.AttendanceLogs
             .Where(a => a.EmployeeId == request.EmployeeId && a.ClockOut == null)
             .FirstOrDefaultAsync();
@@ -190,7 +209,6 @@ public class HRController : BaseApiController
     [HttpPost("payroll-periods/generate")]
     public async Task<IActionResult> GeneratePayrollPeriod([FromBody] GeneratePayrollRequest request)
     {
-        // Check for existing period
         var existing = await _db.PayrollPeriods
             .Where(p => p.WeekStart == request.WeekStart && p.WeekEnd == request.WeekEnd)
             .FirstOrDefaultAsync();
@@ -208,7 +226,6 @@ public class HRController : BaseApiController
         _db.PayrollPeriods.Add(period);
         await _db.SaveChangesAsync();
 
-        // Auto-generate payroll entries for all active employees
         var employees = await _db.Employees
             .Where(e => e.Status == EmploymentStatus.Active || e.Status == EmploymentStatus.Probationary)
             .ToListAsync();
@@ -226,7 +243,7 @@ public class HRController : BaseApiController
                 .Sum(a => (a.ClockOut!.Value - a.ClockIn).TotalHours);
 
             var totalShifts = attendanceLogs.Count;
-            var basePay = emp.BaseSalary / 52; // weekly base
+            var basePay = emp.BaseSalary / 52;
             var commissionAmt = totalShifts > 0 ? emp.CommissionRate * basePay / 100 : 0;
             var mealAmt = emp.ReceivesMealAllowance ? emp.MealAllowanceAmount * totalShifts : 0;
 
@@ -248,7 +265,7 @@ public class HRController : BaseApiController
         }
 
         await _db.SaveChangesAsync();
-        return Ok(new { period.Id, EmployeesProcessed = employees.Count });
+        return Ok(new { PeriodId = period.Id, EmployeesProcessed = employees.Count });
     }
 
     [HttpGet("payroll")]
@@ -330,8 +347,19 @@ public class HRController : BaseApiController
     }
 
     [HttpPost("incidents")]
-    public async Task<IActionResult> CreateIncident([FromBody] IncidentReport incident)
+    public async Task<IActionResult> CreateIncident([FromBody] CreateIncidentRequest req)
     {
+        var incident = new IncidentReport
+        {
+            EmployeeId = req.EmployeeId,
+            BranchId = req.BranchId,
+            Title = req.Title,
+            Description = req.Description,
+            Severity = req.Severity,
+            Status = req.Status,
+            IncidentDate = req.IncidentDate,
+            ReportedBy = req.ReportedBy
+        };
         _db.IncidentReports.Add(incident);
         await _db.SaveChangesAsync();
         return Ok(incident);
@@ -352,7 +380,7 @@ public class HRController : BaseApiController
     public async Task<IActionResult> GetDashboard()
     {
         var now = DateTime.UtcNow;
-        var weekStart = now.AddDays(-(int)now.DayOfWeek); // Sunday
+        var weekStart = now.AddDays(-(int)now.DayOfWeek);
 
         var totalEmployees = await _db.Employees.CountAsync();
         var activeEmployees = await _db.Employees
@@ -394,4 +422,33 @@ public record CreateEmployeeRequest(
     string Email,
     string Address,
     DateTime HireDate
+);
+
+public record UpdateEmployeeRequest(
+    string FirstName,
+    string LastName,
+    string? MiddleName,
+    string ContactNumber,
+    string Email,
+    string Address,
+    string Position,
+    UserRole Role,
+    decimal BaseSalary,
+    decimal CommissionRate,
+    int BranchId,
+    EmploymentStatus Status,
+    bool ReceivesMealAllowance,
+    decimal MealAllowanceAmount,
+    string? Notes = null
+);
+
+public record CreateIncidentRequest(
+    int EmployeeId,
+    int BranchId,
+    string Title,
+    string Description,
+    string Severity,
+    string Status,
+    DateTime IncidentDate,
+    string? ReportedBy = null
 );

@@ -150,9 +150,17 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("waste")]
-    public async Task<IActionResult> RecordWaste([FromBody] WasteRecord waste)
+    public async Task<IActionResult> RecordWaste([FromBody] CreateWasteRequest req)
     {
-        waste.WasteDate = DateTime.UtcNow;
+        var waste = new WasteRecord
+        {
+            InventoryItemId = req.InventoryItemId,
+            InventoryBatchId = req.InventoryBatchId,
+            Quantity = req.Quantity,
+            Reason = req.Reason,
+            EstimatedCost = req.EstimatedCost,
+            WasteDate = DateTime.UtcNow
+        };
         _db.WasteRecords.Add(waste);
 
         // Reduce batch quantity
@@ -162,7 +170,6 @@ public class InventoryController : BaseApiController
             if (batch != null)
             {
                 batch.Quantity -= waste.Quantity;
-                // Update item stock
                 var item = await _db.InventoryItems.FindAsync(batch.InventoryItemId);
                 if (item != null) item.CurrentStock -= waste.Quantity;
             }
@@ -211,10 +218,33 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("purchase-orders")]
-    public async Task<IActionResult> CreatePurchaseOrder([FromBody] PurchaseOrder po)
+    public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderRequest req)
     {
-        po.PoNumber = $"PO-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}";
-        po.Status = PurchaseOrderStatus.Draft;
+        var po = new PurchaseOrder
+        {
+            BranchId = req.BranchId,
+            SupplierId = req.SupplierId,
+            PoNumber = $"PO-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}",
+            Status = PurchaseOrderStatus.Draft,
+            OrderDate = DateTime.UtcNow,
+            ExpectedDeliveryDate = req.ExpectedDeliveryDate,
+            TotalAmount = req.TotalAmount,
+            Notes = req.Notes
+        };
+
+        if (req.Items != null)
+        {
+            foreach (var itemReq in req.Items)
+            {
+                po.Items.Add(new PurchaseOrderItem
+                {
+                    InventoryItemId = itemReq.InventoryItemId,
+                    QuantityOrdered = itemReq.QuantityOrdered,
+                    UnitPrice = itemReq.UnitPrice
+                });
+            }
+        }
+
         _db.PurchaseOrders.Add(po);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetPurchaseOrders), new { id = po.Id }, po);
@@ -229,7 +259,6 @@ public class InventoryController : BaseApiController
             .Where(r => r.IsActive)
             .ToListAsync();
 
-        // Auto-calculate food cost per recipe
         var result = recipes.Select(r => new
         {
             r.Id,
@@ -277,8 +306,31 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("recipes")]
-    public async Task<IActionResult> CreateRecipe([FromBody] Recipe recipe)
+    public async Task<IActionResult> CreateRecipe([FromBody] CreateRecipeRequest req)
     {
+        var recipe = new Recipe
+        {
+            BranchId = req.BranchId,
+            MenuItemName = req.MenuItemName,
+            Category = req.Category,
+            SellingPrice = req.SellingPrice,
+            Description = req.Description,
+            IsActive = true
+        };
+
+        if (req.Ingredients != null)
+        {
+            foreach (var ingReq in req.Ingredients)
+            {
+                recipe.Ingredients.Add(new RecipeIngredient
+                {
+                    InventoryItemId = ingReq.InventoryItemId,
+                    Quantity = ingReq.Quantity,
+                    WastePercent = ingReq.WastePercent
+                });
+            }
+        }
+
         _db.Recipes.Add(recipe);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetRecipes), new { id = recipe.Id }, recipe);
@@ -286,9 +338,16 @@ public class InventoryController : BaseApiController
 
     // === Price History ===
     [HttpPost("price-history")]
-    public async Task<IActionResult> AddPriceRecord([FromBody] RawMaterialPriceHistory record)
+    public async Task<IActionResult> AddPriceRecord([FromBody] AddPriceRecordRequest req)
     {
-        record.PriceDate = DateTime.UtcNow;
+        var record = new RawMaterialPriceHistory
+        {
+            InventoryItemId = req.InventoryItemId,
+            Price = req.Price,
+            SupplierId = req.SupplierId,
+            PriceDate = DateTime.UtcNow,
+            Notes = req.Notes
+        };
         _db.RawMaterialPriceHistories.Add(record);
         await _db.SaveChangesAsync();
         return Ok(record);
@@ -314,9 +373,19 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPost("equipment/{id}/maintenance")]
-    public async Task<IActionResult> AddMaintenanceRecord(int id, [FromBody] MaintenanceRecord record)
+    public async Task<IActionResult> AddMaintenanceRecord(int id, [FromBody] CreateMaintenanceRequest req)
     {
-        record.EquipmentId = id;
+        var record = new MaintenanceRecord
+        {
+            EquipmentId = id,
+            Type = req.Type,
+            Description = req.Description,
+            Cost = req.Cost,
+            PerformedBy = req.PerformedBy,
+            MaintenanceDate = req.MaintenanceDate,
+            Notes = req.Notes,
+            NextScheduledDate = req.NextScheduledDate
+        };
         _db.MaintenanceRecords.Add(record);
         await _db.SaveChangesAsync();
         return Ok(record);
@@ -399,4 +468,59 @@ public record UpdateItemRequest(
     bool IsActive,
     string? Description = null,
     string? Barcode = null
+);
+
+public record CreateWasteRequest(
+    int InventoryItemId,
+    decimal Quantity,
+    string Reason,
+    decimal EstimatedCost,
+    int? InventoryBatchId = null
+);
+
+public record CreatePurchaseOrderItemRequest(
+    int InventoryItemId,
+    decimal QuantityOrdered,
+    decimal UnitPrice
+);
+
+public record CreatePurchaseOrderRequest(
+    int BranchId,
+    int SupplierId,
+    decimal TotalAmount,
+    List<CreatePurchaseOrderItemRequest>? Items = null,
+    DateTime? ExpectedDeliveryDate = null,
+    string? Notes = null
+);
+
+public record CreateRecipeIngredientRequest(
+    int InventoryItemId,
+    decimal Quantity,
+    decimal WastePercent = 0
+);
+
+public record CreateRecipeRequest(
+    int BranchId,
+    string MenuItemName,
+    string Category,
+    decimal SellingPrice,
+    List<CreateRecipeIngredientRequest>? Ingredients = null,
+    string? Description = null
+);
+
+public record AddPriceRecordRequest(
+    int InventoryItemId,
+    decimal Price,
+    int? SupplierId = null,
+    string? Notes = null
+);
+
+public record CreateMaintenanceRequest(
+    string Type,
+    string Description,
+    decimal Cost,
+    string PerformedBy,
+    DateTime MaintenanceDate,
+    string? Notes = null,
+    DateTime? NextScheduledDate = null
 );
