@@ -58,20 +58,20 @@ public class InventoryController : BaseApiController
     }
 
     [HttpPut("items/{id}")]
-    public async Task<IActionResult> UpdateItem(int id, [FromBody] InventoryItem item)
+    public async Task<IActionResult> UpdateItem(int id, [FromBody] UpdateItemRequest req)
     {
         var existing = await _db.InventoryItems.FindAsync(id);
         if (existing == null) return NotFound();
 
-        existing.Name = item.Name;
-        existing.Category = item.Category;
-        existing.UnitOfMeasure = item.UnitOfMeasure;
-        existing.MinStockLevel = item.MinStockLevel;
-        existing.ReorderPoint = item.ReorderPoint;
-        existing.IsPerishable = item.IsPerishable;
-        existing.IsActive = item.IsActive;
-        existing.Description = item.Description;
-        existing.Barcode = item.Barcode;
+        existing.Name = req.Name;
+        existing.Category = req.Category;
+        existing.UnitOfMeasure = req.UnitOfMeasure;
+        existing.MinStockLevel = req.MinStockLevel;
+        existing.ReorderPoint = req.ReorderPoint;
+        existing.IsPerishable = req.IsPerishable;
+        existing.IsActive = req.IsActive;
+        existing.Description = req.Description;
+        existing.Barcode = req.Barcode;
 
         await _db.SaveChangesAsync();
         return Ok(existing);
@@ -387,4 +387,16 @@ public record CreateSupplierRequest(
     string Email,
     string Address,
     string TinNumber
+);
+
+public record UpdateItemRequest(
+    string Name,
+    string Category,
+    string UnitOfMeasure,
+    decimal MinStockLevel,
+    decimal ReorderPoint,
+    bool IsPerishable,
+    bool IsActive,
+    string? Description = null,
+    string? Barcode = null
 );

@@ -11,6 +11,8 @@ obj/
 
 # SQLite
 *.db
+*.db-shm
+*.db-wal
 
 # VS
 .vs/
