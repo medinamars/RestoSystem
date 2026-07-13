@@ -288,7 +288,27 @@ public class HRController : BaseApiController
         if (periodId.HasValue) query = query.Where(p => p.PayrollPeriodId == periodId);
         if (employeeId.HasValue) query = query.Where(p => p.EmployeeId == employeeId);
 
-        return Ok(await query.OrderByDescending(p => p.PayrollPeriod.WeekStart).ToListAsync());
+        var result = await query
+            .OrderByDescending(p => p.PayrollPeriod.WeekStart)
+            .Select(p => new
+            {
+                p.Id,
+                p.PayrollPeriodId,
+                p.EmployeeId,
+                GrossPay = p.GrossPay,
+                TotalDeductions = p.TotalDeductions,
+                NetPay = p.NetPay,
+                BaseSalaryAmount = p.BaseSalaryAmount,
+                CommissionAmount = p.CommissionAmount,
+                MealAllowanceAmount = p.MealAllowanceAmount,
+                TotalHoursWorked = p.TotalHoursWorked,
+                TotalShifts = p.TotalShifts,
+                Employee = p.Employee != null ? new { p.Employee.Id, p.Employee.FirstName, p.Employee.LastName, p.Employee.Position, p.Employee.EmployeeCode, p.Employee.Status } : null,
+                PayrollPeriod = p.PayrollPeriod != null ? new { p.PayrollPeriod.Id, p.PayrollPeriod.WeekStart, p.PayrollPeriod.WeekEnd, p.PayrollPeriod.PayDate, p.PayrollPeriod.IsProcessed } : null
+            })
+            .ToListAsync();
+
+        return Ok(result);
     }
 
     // === Payslips ===
